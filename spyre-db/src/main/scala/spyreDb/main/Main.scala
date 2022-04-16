@@ -13,9 +13,7 @@ object Main {
       println
       println(s"=====| ${table.tableName} |=====")
       println(Table.showHierarchy(table))
-      // println
-      // println("--- Byte Layout ---")
-      // println(table.byteLayout)
+      println(Table.byteLayout(table))
     }
 
     def showSchema(name: String, show: Boolean)(tables: Table*): Unit =

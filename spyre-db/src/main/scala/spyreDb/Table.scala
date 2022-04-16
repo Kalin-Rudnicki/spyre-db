@@ -2,6 +2,7 @@ package spyreDb
 
 import cats.data.NonEmptyList
 import klib.utils.*
+import scala.annotation.internal.sharable
 
 sealed trait Table {
 
@@ -50,6 +51,41 @@ object Table {
         rec(table, Nil, Nil),
       )
       .toString("    ")
+  }
+
+  def byteLayout(table: Table): String = {
+    def col(c: Column[ColumnType], i: Int): String = {
+      val char: Char =
+        if (i < 0) ???
+        else if (i < 10) (i + '0').toChar
+        else if (i < 36) (i + 'A' - 10).toChar
+        else if (i < 62) (i + 'a' - 36).toChar
+        else ???
+
+      char.toString * c.columnType.numBytes
+    }
+
+    def rec(table: Table, rNamespace: List[String], inheritedColumns: List[Column[ColumnType.NonPK]]): NonEmptyList[(String, String)] =
+      table match {
+        case Standard(tableName, columns) =>
+          NonEmptyList.one(
+            (
+              NonEmptyList(tableName, rNamespace).toList.reverse.mkString("."),
+              allColumns(table, rNamespace, inheritedColumns ::: columns).toList.zipWithIndex.map(col).mkString,
+            ),
+          )
+        case Polymorphic(tableName, sharedColumns, subTypes) =>
+          subTypes.toNel.flatMap(rec(_, tableName :: rNamespace, inheritedColumns ::: sharedColumns))
+      }
+
+    val res = rec(table, Nil, Nil)
+    val maxNameLength = res.map(_._1.length).toList.max
+    val maxBytes = res.map(_._2.length).toList.max
+
+    res
+      .map { (n, b) => s"${n.alignRight(maxNameLength, ' ')} : ${b.alignLeft(maxBytes, '_')}" }
+      .toList
+      .mkString("--- Byte Layout ---\n", "\n", "")
   }
 
 }
