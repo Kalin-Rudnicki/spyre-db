@@ -1,7 +1,17 @@
 package spyreDb
 
+import cats.data.NonEmptyList
+
 sealed trait Table {
+
   val tableName: String
+
+  private final def allColumns(rNamespace: List[String], cols: List[Column[ColumnType.NonPK]]): NonEmptyList[Column[ColumnType]] =
+    this match {
+      case _: Table.Standard    => NonEmptyList(Column.primaryKey(tableName, rNamespace.reverse*), Column.byte("polymorphicId") :: cols)
+      case _: Table.Polymorphic => NonEmptyList(Column.primaryKey(tableName, rNamespace.reverse*), cols)
+    }
+
 }
 object Table {
 

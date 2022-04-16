@@ -2,7 +2,9 @@ package spyreDb
 
 import cats.data.NonEmptyList
 
-final case class Column[+C <: ColumnType](columnName: String, columnType: C)
+final case class Column[+C <: ColumnType](columnName: String, columnType: C) {
+  def optional(implicit ev: C <:< ColumnType.NonOptional): Column[ColumnType.Optional] = Column(columnName, ColumnType.Optional(ev(columnType)))
+}
 object Column {
   import ColumnType.*
 
@@ -10,7 +12,7 @@ object Column {
   def polymorphic(columnName: String)(st0: Standard, st1: Standard, stN: Standard*): Column[Polymorphic] = Column(columnName, Polymorphic(NENEList(st0, st1, stN.toList)))
 
   // uuid
-  def primaryKey(columnName: String, r0: String, rN: String*): Column[PrimaryKey] = Column(columnName, PrimaryKey(NonEmptyList(r0, rN.toList)))
+  def primaryKey(r0: String, rN: String*): Column[PrimaryKey] = Column("id", PrimaryKey(NonEmptyList(r0, rN.toList)))
   def foreignKey(columnName: String, r0: String, rN: String*): Column[ForeignKey] = Column(columnName, ForeignKey(NonEmptyList(r0, rN.toList)))
   def uuid(columnName: String): Column[UUID.type] = Column(columnName, UUID)
 

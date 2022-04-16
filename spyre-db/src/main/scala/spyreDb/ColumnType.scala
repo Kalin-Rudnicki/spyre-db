@@ -11,7 +11,7 @@ object ColumnType {
   sealed abstract class Standard(typeName: String, numBytesNonOptional: Int, canRepresentNull: Boolean) extends NonOptional(typeName, numBytesNonOptional, canRepresentNull)
 
   // optional
-  final case class Optional[+C <: NonOptional](base: C) extends NonPK(s"Option[${base.typeName}]", base.numBytesNonOptional + (if (base.canRepresentNull) 0 else 1))
+  final case class Optional(base: NonOptional) extends NonPK(s"Option[${base.typeName}]", base.numBytesNonOptional + (if (base.canRepresentNull) 0 else 1))
 
   // polymorphic
   final case class Polymorphic(subTypes: NENEList[ColumnType.Standard])
