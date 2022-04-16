@@ -13,7 +13,7 @@ object Column {
 
   // uuid
   def primaryKey(r0: String, rN: String*): Column[PrimaryKey] = Column("id", PrimaryKey(NonEmptyList(r0, rN.toList)))
-  def foreignKey(columnName: String, r0: String, rN: String*): Column[ForeignKey] = Column(columnName, ForeignKey(NonEmptyList(r0, rN.toList)))
+  def foreignKey(columnName: String)(r0: String, rN: String*): Column[ForeignKey] = Column(columnName, ForeignKey(NonEmptyList(r0, rN.toList)))
   def uuid(columnName: String): Column[UUID.type] = Column(columnName, UUID)
 
   // integer

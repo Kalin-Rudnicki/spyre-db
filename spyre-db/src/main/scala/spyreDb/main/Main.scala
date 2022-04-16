@@ -1,5 +1,6 @@
 package spyreDb.main
 
+import cats.data.NonEmptyList
 import klib.utils.{given, *}
 
 import spyreDb.*
@@ -7,16 +8,14 @@ import spyreDb.*
 object Main {
 
   def main(args: Array[String]): Unit = {
-    /*
     def showTable(table: Table): Unit = {
       println
       println
       println(s"=====| ${table.tableName} |=====")
-      println("--- Fields ---")
-      println(table.nestedColumns)
-      println
-      println("--- Byte Layout ---")
-      println(table.byteLayout)
+      println(Table.showHierarchy(table))
+      // println
+      // println("--- Byte Layout ---")
+      // println(table.byteLayout)
     }
 
     def showSchema(name: String, show: Boolean)(tables: Table*): Unit =
@@ -51,23 +50,23 @@ object Main {
         ),
       ),
       Table.standard("PersonOwnsVehicle")(
-        Column.key("personId", "Person"),
-        Column.key("vehicleId", "Vehicle"),
+        Column.foreignKey("personId")("Person"),
+        Column.foreignKey("vehicleId")("Vehicle"),
       ),
       Table.standard("TrafficViolationStandard")(
-        Column.key("officerPersonId", "Person"),
-        Column.key("vehicleId", "Vehicle", "LandVehicle", "RoadVehicle"),
+        Column.foreignKey("officerPersonId")("Person"),
+        Column.foreignKey("vehicleId")("Vehicle", "LandVehicle", "RoadVehicle"),
         Column.double("fineAmount"),
-        Column.key("driverPersonId", "Person").optional,
+        Column.foreignKey("driverPersonId")("Person").optional,
       ),
       Table.polymorphic("TrafficViolationPolymorphic")(
-        Column.key("officerPersonId", "Person"),
-        Column.key("vehicleId", "Vehicle", "LandVehicle", "RoadVehicle"),
+        Column.foreignKey("officerPersonId")("Person"),
+        Column.foreignKey("vehicleId")("Vehicle", "LandVehicle", "RoadVehicle"),
         Column.double("fineAmount"),
       )(
         Table.standard("NonMovingViolation")(),
         Table.standard("MovingViolation")(
-          Column.key("driverPersonId", "Person"),
+          Column.foreignKey("driverPersonId")("Person"),
         ),
       ),
     )
@@ -86,22 +85,21 @@ object Main {
         ),
       ),
       Table.standard("MusicianInBand")(
-        Column.key("musicianId", "MusicalEntity", "Musician"),
-        Column.key("bandId", "MusicalEntity", "Band"),
+        Column.foreignKey("musicianId")("MusicalEntity", "Musician"),
+        Column.foreignKey("bandId")("MusicalEntity", "Band"),
       ),
       Table.standard("Album")(
         Column.string("name"),
-        Column.key("madeById", "MusicalEntity"),
+        Column.foreignKey("madeById")("MusicalEntity"),
       ),
       Table.standard("Song")(
         Column.string("name"),
         Column.polymorphic("belongsTo")(
-          ColumnType.KeyColumnType(List("MusicalEntity")),
-          ColumnType.KeyColumnType(List("Album")),
+          ColumnType.ForeignKey(NonEmptyList.of("MusicalEntity")),
+          ColumnType.ForeignKey(NonEmptyList.of("Album")),
         ),
       ),
     )
-     */
   }
 
 }
