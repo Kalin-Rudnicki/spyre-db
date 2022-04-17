@@ -3,7 +3,7 @@ package spyreDb.main
 import cats.data.NonEmptyList
 import klib.utils.{given, *}
 
-import spyreDb.*
+import spyreDb.schema.*
 
 object Main {
 
@@ -100,8 +100,5 @@ object Main {
       ),
     )
   }
-
-
-  
 
 }

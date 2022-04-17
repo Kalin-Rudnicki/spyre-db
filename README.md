@@ -139,7 +139,7 @@ showSchema("schema-2", true)(
     ),
   ),
 )
- ```
+```
 
 Here are a few special things to note:
   - `MusicalEntity` is a polymorphic table.  

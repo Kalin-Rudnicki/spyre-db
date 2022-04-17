@@ -1,4 +1,4 @@
-package spyreDb
+package spyreDb.schema
 
 import cats.data.NonEmptyList
 import klib.utils.*
