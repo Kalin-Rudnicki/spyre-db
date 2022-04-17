@@ -40,4 +40,7 @@ object ColumnType {
   case object _Boolean extends Standard("Boolean", 1, true)
   case object _String extends Standard("String", 8, true)
 
+  // helpers
+  def foreignKey(r0: String, rN: String*): ForeignKey = ForeignKey(NonEmptyList(r0, rN.toList))
+
 }

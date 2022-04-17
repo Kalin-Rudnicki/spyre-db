@@ -85,6 +85,7 @@ object Main {
       Table.standard("MusicianInBand")(
         Column.foreignKey("musicianId")("MusicalEntity", "Musician"),
         Column.foreignKey("bandId")("MusicalEntity", "Band"),
+        Column.string("instrument"),
       ),
       Table.standard("Album")(
         Column.string("name"),
@@ -93,8 +94,8 @@ object Main {
       Table.standard("Song")(
         Column.string("name"),
         Column.polymorphic("belongsTo")(
-          ColumnType.ForeignKey(NonEmptyList.of("MusicalEntity")),
-          ColumnType.ForeignKey(NonEmptyList.of("Album")),
+          ColumnType.foreignKey("MusicalEntity"),
+          ColumnType.foreignKey("Album"),
         ),
       ),
     )
