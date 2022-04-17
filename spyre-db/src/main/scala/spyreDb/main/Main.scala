@@ -93,12 +93,15 @@ object Main {
       ),
       Table.standard("Song")(
         Column.string("name"),
-        Column.polymorphic("belongsTo")(
+        Column.polymorphic("belongsToId")(
           ColumnType.foreignKey("MusicalEntity"),
           ColumnType.foreignKey("Album"),
         ),
       ),
     )
   }
+
+
+  
 
 }

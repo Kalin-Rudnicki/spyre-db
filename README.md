@@ -96,10 +96,11 @@
   4) You run the same tool on the migration, and it re-gens a new database that also knows how to migrate from the previous schema  
      (Also possibly knows how to support queries from previous schemas?)
   5) Since the db knows everything about what it is supposed to be, and there is no support for this on-the-fly schema alteration, it shoud be possible to also code-gen libraries to easily define queries and interact with the database.  
-  6) This could be done for several frameworks/languages: `lib-scala-zio`, `lib-scala-cats`, `lib-ruby`, `lib-_____`, ...  
+  6) This could be done for several frameworks/languages: `lib-scala-zio`, `lib-scala-cats`, `lib-ruby`, `lib-python`, ...  
      Then, if someone contributes the ability to code-gen for a specific language/framework, all databases would then support the ability to have an automatic library to use with that language.  
      It would also be possible to (either in the same lib, or a separate one) define a lib for the same language/framework, but possibly a different DSL or preference on how to define queries.
-  7) It should then be possible to hit the db socket with a request for a lib, and it will stream/download it for you. Maybe this doesnt really end up having any practical use in the end, but its an idea none the less, lol.
+  7) It should then be possible to hit the db socket with a request for a lib, and it will stream/download it for you. Maybe this doesnt really end up having any practical use in the end, but its an idea none the less, lol.  
+  It probably makes more sense to have the codegen tool be able to publish to `sonatype`/`gem`/...
 
 ### Example Schema
 
@@ -132,7 +133,7 @@ showSchema("schema-2", true)(
   ),
   Table.standard("Song")(
     Column.string("name"),
-    Column.polymorphic("belongsTo")(
+    Column.polymorphic("belongsToId")(
       ColumnType.foreignKey("MusicalEntity"),
       ColumnType.foreignKey("Album"),
     ),
@@ -149,3 +150,55 @@ Here are a few special things to note:
   - `Song` has a polymorphic column that could either point to a `MusicalEntity` or an `Album`.  
     This lets you represent that a `Song` is either a single or part of an `Album`.  
     If it is a single, it could belong to either a `Band` or a `Musician`.
+
+### Example Query
+
+I really need to put some more thought into this, but I imagine defining a query would look something like this:
+
+```scala
+  val query1: Query[
+    List[(
+      MusicalEntity.Musician,
+      List[Song],
+      List[(
+        Album,
+        List[Song]
+      )],
+    )],
+  ] =
+    MusicalEntity.Musician.select { m =>
+      (
+        m,
+        Song.belongsToId(m.id),
+        Album.madeById(m.id).select { a =>
+          (
+            a,
+            Song.belongsToId(a.id),
+          )
+        },
+      )
+    }
+```
+
+```scala
+  val query2: Query[
+    List[(
+      MusicalEntity.Band,
+      List[(
+        String,
+        MusicalEntity.Musician,
+      )],
+    )],
+  ] =
+    MusicalEntity.Band.select { b =>
+      (
+        b,
+        MusicianInBand.bandId(b.id).select { mib =>
+          (
+            mib.instrument,
+            Musician.id(mib.musicianId),
+          )
+        },
+      )
+    }
+```
