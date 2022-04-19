@@ -5,6 +5,9 @@ import cats.data.NonEmptyList
 sealed abstract class ColumnType(final val typeName: String, final val numBytes: Int)
 object ColumnType {
 
+  // builders
+  def foreignKey(r0: String, rN: String*): ForeignKey = ForeignKey(NonEmptyList(r0, rN.toList))
+
   // non-pk
   sealed abstract class NonPK(typeName: String, numBytes: Int) extends ColumnType(typeName, numBytes)
   sealed abstract class NonOptional(typeName: String, final val numBytesNonOptional: Int, final val canRepresentNull: Boolean) extends NonPK(typeName, numBytesNonOptional)
@@ -39,8 +42,5 @@ object ColumnType {
   // other
   case object _Boolean extends Standard("Boolean", 1, true)
   case object _String extends Standard("String", 8, true)
-
-  // helpers
-  def foreignKey(r0: String, rN: String*): ForeignKey = ForeignKey(NonEmptyList(r0, rN.toList))
 
 }

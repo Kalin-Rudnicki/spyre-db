@@ -78,7 +78,7 @@ object Table {
           NonEmptyList.one(
             (
               NonEmptyList(tableName, rNamespace).toList.reverse.mkString("."),
-              allColumns(table, poly, rNamespace, inheritedColumns ::: columns).toList.zipWithIndex.map(col).mkString,
+              allColumns(table, poly, rNamespace, inheritedColumns ::: columns).toList.zipWithIndex.map(col).mkString("?", "", ""),
             ),
           )
         case Polymorphic(tableName, sharedColumns, subTypes) =>

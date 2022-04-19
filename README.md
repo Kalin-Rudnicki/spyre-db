@@ -102,6 +102,55 @@
   7) It should then be possible to hit the db socket with a request for a lib, and it will stream/download it for you. Maybe this doesnt really end up having any practical use in the end, but its an idea none the less, lol.  
   It probably makes more sense to have the codegen tool be able to publish to `sonatype`/`gem`/...
 
+
+### Output
+
+```
+=====| MusicalEntity |=====
+--- Hierarchy ---
+*MusicalEntity([0] id: PrimaryKey[MusicalEntity], [1] polymorphicId: Byte) ->
+    Musician([0] id: PrimaryKey[MusicalEntity.Musician], [1] polymorphicId: Byte, [2] firstName: String, [3] lastName: String, [4] birthday: Long)
+    Band([0] id: PrimaryKey[MusicalEntity.Band], [1] polymorphicId: Byte, [2] name: String, [3] formationDate: Long)
+--- Byte Layout ---
+MusicalEntity.Musician : ?00000000000000001222222223333333344444444
+    MusicalEntity.Band : ?000000000000000012222222233333333________
+
+
+=====| MusicianInBand |=====
+--- Hierarchy ---
+MusicianInBand([0] id: PrimaryKey[MusicianInBand], [1] musicianId: ForeignKey[MusicalEntity.Musician], [2] bandId: ForeignKey[MusicalEntity.Band], [3] instrument: String)
+--- Byte Layout ---
+MusicianInBand : ?00000000000000001111111111111111222222222222222233333333
+
+
+=====| Album |=====
+--- Hierarchy ---
+Album([0] id: PrimaryKey[Album], [1] name: String, [2] madeById: ForeignKey[MusicalEntity])
+--- Byte Layout ---
+Album : ?0000000000000000111111112222222222222222
+
+
+=====| Song |=====
+--- Hierarchy ---
+Song([0] id: PrimaryKey[Song], [1] name: String, [2] belongsToId: Polymorphic[ForeignKey[MusicalEntity] | ForeignKey[Album]])
+--- Byte Layout ---
+Song : ?00000000000000001111111122222222222222222
+```
+
+```
+=====| Vehicle |=====
+--- Hierarchy ---
+*Vehicle([0] id: PrimaryKey[Vehicle], [1] polymorphicId: Byte) ->
+    Boat([0] id: PrimaryKey[Vehicle.Boat], [1] polymorphicId: Byte, [2] color: String, [3] length: Double)
+    *LandVehicle([0] id: PrimaryKey[Vehicle.LandVehicle], [1] polymorphicId: Byte, [2] color: String) ->
+        RoadVehicle([0] id: PrimaryKey[Vehicle.LandVehicle.RoadVehicle], [1] polymorphicId: Byte, [2] color: String, [3] numWheels: Int, [4] licensePlateNo: String)
+        OffRoadVehicle([0] id: PrimaryKey[Vehicle.LandVehicle.OffRoadVehicle], [1] polymorphicId: Byte, [2] color: String, [3] numWheels: Int, [4] canDriveInMud: Boolean)
+--- Byte Layout ---
+                      Vehicle.Boat : ?000000000000000012222222233333333____
+   Vehicle.LandVehicle.RoadVehicle : ?0000000000000000122222222333344444444
+Vehicle.LandVehicle.OffRoadVehicle : ?000000000000000012222222233334_______
+```
+
 ### Example Schema
 
 Note that this is very much just a draft.  
