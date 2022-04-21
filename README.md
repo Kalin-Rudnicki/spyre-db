@@ -303,3 +303,14 @@ I really need to put some more thought into this, but I imagine defining a query
       )
     }
 ```
+
+### More Thoughts
+
+- As mentioned before, data integrety is one of the greatest concerns with this approach, and should therefore take precedence over something like concurrency. If a cleaver solution arises that can efficiently do both, then thats great. For the initial proof of concept, the entire database will be locked on writes, but multiple concurrent reads would be fine.
+- Also on the note of data integrety, and relating to schema definition:  
+  It should also be possible/required (?) to define the behavior of deletes & cascading. The options I can think of off the top of my head are:
+    - Non-Optional Column : `Block`, `Cascade`
+    - Optional Column : `Block`, `Cascade`, `Unset`
+
+  With this information, the codegen tool should be able to generate clear documentation in plain language that says something along the lines of `If you delete a row from this table, then this is what will happen in these other tables: ...`
+- I think one of the trickiest things to implement would be transactions, especially juggling them with the above constraint of data integrety being the most important thing. The logic that follows of making the dumbest, but most accurate implementation would be that you would have the lock the entire database for the entire duration of the write transaction. I am sure there is a way to make sensible tradeoffs here, but I am not sure what that would be yet.
