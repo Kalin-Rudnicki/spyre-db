@@ -2,12 +2,12 @@
 # SpyreDb
 
 - What is this idea?  
-  Playing around wiith the idea of a different way to model a database.
+  Playing around with the idea of a different way to model a database.
 - Why?  
   It really seems to me that every time I need to interact with a database, it is always a negative experience, and I want to try and contemplate whether it could be done better.
 - What causes this negative experience?  
   I see 3 primary reasons:  
-  1) Needing to make sacrifices on data model accuracy/integrety, because standard databases don't support any concept of polymorphism, or ADTs. Maybe in some case it is possibe to do so through very hacky means, but this almost always feels bad/wrong.
+  1) Needing to make sacrifices on data model accuracy/integrety, because standard databases don't support any concept of polymorphism, or ADTs. Maybe in some cases it is possibe to do so through very hacky means, but this almost always feels bad/wrong.
   2) Even simple/common queries seem very inefficient to me...  
      I have never seen the code for a database, but I imagine a join looking something like this:
      ```scala
@@ -17,15 +17,15 @@
        }
      }
      ```
-     The inefficient part of this being that if the join to `tableB` produces 100,000 rows for some `a`, you have outputted `a` 100,000 times. Maybe the database actually sends it 100,000 times over the wire, or maybe it only sends the first one, and then it gets added to every row, but either way its going to be in the memory of whoever sent the query 100,000 times.  
+     The inefficient part of this being that if the join to `tableB` produces 100,000 `b`s for some `a`, you have outputted `a` 100,000 times. Maybe the database actually sends it 100,000 times over the wire, or maybe it only sends the first one, and then it gets added to every row, but either way its going to be in the memory of whoever sent the query 100,000 times.  
      Then, whoever sent the query probably immediately wants to do this:
      ```scala
      results.groupMap(_.a)(_.b)
      ```
-     Furthermore, imagine you also joined this to some table `c`, which has 100 records per `(a, b)`. Now you've duplicated every `b` 100 times, and `a` 10,000,000 times.  
+     Furthermore, imagine you also joined this to some table `c`, which has 100 `c`s per `(a, b)`. Now you've duplicated every `b` 100 times, and `a` 10,000,000 times.  
      The point here is that this way of querying data and returning the result is more of a widely accepted limitation of "just the way things are", as opposed to how we would actually like to query and return things (at least in my opinion).
   3) Because of these frustrations, as well as a lack of an ORM that I have really fallen in love with, it is just so un-fun to work with databases. I see that as a really bad thing, given that a significant majority of non-trivial programs use a database.  
-    Maybe if there are a plethora of ORMs, and nobody can decide on which one is the least sufferable, then maybe the ORMs are not the problem, and the database model itself is :thinking:.
+     Maybe if there are a plethora of ORMs, and nobody can decide on which one is the least sufferable, then maybe the ORMs are not the problem, and the database model itself is :thinking:.
 
 - As a side note relating to NOSQL databases: I am by no means super familiar with these, but after doing some research, the popular ones do not seem to solve the problems I want to solve without introducing new annoyances or problems.  
   I think that there are some flaws surrounding the standard SQL database, but I still think that the concept of tables, columns, and joins is the best way to go. It just needs to be tweaked.
@@ -33,12 +33,12 @@
 ### What should a database be/provide?
 
 - The way the schema is modeled should feel like a natural extension of the problem you are trying to solve. At no point while designing your schema should you grimmace and say to yourself "oh... that feels hacky" or "ugh, I wish I didn't have to do it this way".
-- While modeling your schema should feel natural and easy, you also shouldn't have to make sacrifices in data integrety, allowing for non-existent states to be stored in the database, just because the database doesn't have the ability to model it properly, or because you would have to fly over the moon in order to model it properly. This means we will need some level of polymorphism.
-- While you should be able to model data as accurately as possible leveraging polymorphism, it should also be as simple to model as possible. It is very common that a database tables primary-key is a long or uuid, and then other tables reference it using that id. Lets just go ahead and say this is the only way to do it (uuid, it is automatically added as `id: UUID`, and does not need to be specified), and then lets also make those ids typed, so that it becomes blantantly obvious in your model what you are trying to achieve.
+- While modeling your schema should feel natural and easy, you also shouldn't have to make sacrifices in data integrety, allowing for invalid states to be stored in the database, just because the database doesn't have the ability to model it properly, or because you would have to fly over the moon in order to model it properly. This means we will need some level of polymorphism.
+- While you should be able to model data as accurately as possible leveraging polymorphism, it should also be as simple to model as possible. It is very common that a tables primary-key is a long or uuid, and then other tables reference it using that id. Lets just go ahead and say this is the only way to do it (uuid, it is automatically added as `id: UUID`, and does not need to be specified), and then lets also make those ids typed, so that it becomes blantantly obvious in your model what you are trying to achieve.
 - Who uses databases? Database admins? No. Programmers. Databases should be designed in order to optimize for maximum efficiency for use in code, because that is what is going to be doing the most interaction with it.
   - Queries should be easy and obvious to write in code (I am personally a huge stickler for wanting an elegant DSL for writing something such as queries)
   - These queries should also be type-safe (assuming you are using a typed language)
-  - While I want a nice DSL to define queries, the queries should actually be able to return what I want, not some backwards-ass representation that most people just accept as the fact of reality, then using an ORM to put a band-aid on it, and having to do silly transforms such as the `groupMap` mentioned above
+  - While I want a nice DSL to define queries, the queries should actually be able to return what I want, not some ass-backwards representation that most people just accept as the fact of reality, then using an ORM to put a band-aid on it, and having to do silly transforms such as the `groupMap` mentioned above
 - It should be able to do all of these things, while still being very efficient.  
   To be honest, I think that some of these changes could actually result in something more efficient that standard databases, given it goes through just as much optimization.
 - A proof of concept should be considered a success if it is able return results as described below in a sensical way, with the opportunity to optimize it further. Optimization and a nice API to interact with it can always be added.
