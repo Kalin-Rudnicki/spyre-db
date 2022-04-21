@@ -75,7 +75,11 @@ object RowCodec {
       write: (ByteBuffer, R) => Unit,
       read: (ByteBuffer) => R,
   ): RowCodec[R] =
-    ???
+    RowCodec[R](
+      bytesPerRow,
+      (_, byteBuffer, row) => write(byteBuffer, row),
+      (_, byteBuffer) => read(byteBuffer),
+    )
 
   // --- Non-Optional ---
 
