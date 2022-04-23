@@ -1,6 +1,8 @@
 package spyreDb.db
 
-final class VariableSizeStorage {
+import java.io.RandomAccessFile
+
+final class VariableSizeStorage(vssRAF: RandomAccessFile) {
 
   def free(pos: Long): Unit = ???
 
