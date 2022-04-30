@@ -89,7 +89,7 @@ final class ReadWriteLock[L: Tag] {
 
     private def forkExecuteNext(next: AppliedNext): UIO[Unit] =
       next match {
-        case AppliedNext.ToRead(reads)                => ZIO.foreachParDiscard(reads.toList) { (uuid, readEffect) => registerReadEffect(uuid, readEffect) }.fork.unit
+        case AppliedNext.ToRead(reads)                => ZIO.foreachParDiscard(reads.toList)(registerReadEffect).fork.unit
         case AppliedNext.ToWrite((uuid, writeEffect)) => registerWriteEffect(uuid, writeEffect).fork.unit
         case AppliedNext.ToWait                       => ZIO.unit
       }
@@ -161,7 +161,7 @@ final class ReadWriteLock[L: Tag] {
       for {
         readEffect <- ReadEffect.fromZIO[R, E, A](zio, register)
         readAccess <- attemptToAcquireReadAccess(readEffect)
-        _ <- ZIO.foreach(readAccess)(registerReadEffect(_, readEffect))
+        _ <- ZIO.foreachDiscard(readAccess)(registerReadEffect(_, readEffect))
       } yield ()
     }
   }

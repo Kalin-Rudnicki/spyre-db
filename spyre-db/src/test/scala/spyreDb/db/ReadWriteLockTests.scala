@@ -16,6 +16,16 @@ object ReadWriteLockTests extends DefaultRunnableSpec {
       ref.update(i :: _).as(i).delay(Duration.fromMillis(500))
     }.fork <* Clock.sleep(Duration.fromMillis(50))
 
+  private def readZIO[E, A](rwl: ReadWriteLock[Unit], zio: IO[E, A]): URIO[Clock, Fiber[E, A]] =
+    rwl.read {
+      zio.delay(Duration.fromMillis(500))
+    }.fork <* Clock.sleep(Duration.fromMillis(50))
+
+  private def writeZIO[E, A](rwl: ReadWriteLock[Unit], zio: IO[E, A]): URIO[Clock, Fiber[E, A]] =
+    rwl.write {
+      zio.delay(Duration.fromMillis(500))
+    }.fork <* Clock.sleep(Duration.fromMillis(50))
+
   override def spec: ZSpec[TestEnvironment, Any] =
     suite("ReadWriteLockTests")(
       test("read works") {
@@ -70,27 +80,68 @@ object ReadWriteLockTests extends DefaultRunnableSpec {
             f4 <- read(ref, rwl, 4)
             _ <- Fiber.joinAll(Seq(f1, f2, f3, f4))
           } yield ()).timed
-          list <- ref.get.map(_.sorted)
+          list <- ref.get.map(_.reverse)
         } yield assert(duration)(isGreaterThanEqualTo(Duration.fromMillis(500))) &&
           assert(duration)(isLessThan(Duration.fromMillis(1000))) &&
           assert(list)(equalTo(List(1, 2, 3, 4)))
       },
-      test("write blocks reads") {
+      test("proper blocking") {
         for {
           ref <- Ref.make(List.empty[Int])
           rwl = ReadWriteLock.make[Unit]
-          (duration, _) <- (for {
+          (duration, list) <- (for {
             f1 <- write(ref, rwl, 1)
             f2 <- read(ref, rwl, 2)
             f3 <- read(ref, rwl, 3)
             f4 <- read(ref, rwl, 4)
-            f5 <- read(ref, rwl, 5)
-            _ <- Fiber.joinAll(Seq(f1, f2, f3, f4, f5))
-          } yield ()).timed
-          list <- ref.get.map(_.sorted)
-        } yield assert(duration)(isGreaterThanEqualTo(Duration.fromMillis(1000))) &&
-          assert(duration)(isLessThan(Duration.fromMillis(1500))) &&
-          assert(list)(equalTo(List(1, 2, 3, 4, 5)))
+            f5 <- write(ref, rwl, 5)
+            f6 <- read(ref, rwl, 6)
+            f7 <- read(ref, rwl, 7)
+            f8 <- read(ref, rwl, 8)
+            f9 <- write(ref, rwl, 9)
+            _ <- Fiber.joinAll(Seq(f1, f2, f3, f4, f5, f6, f7, f8, f9))
+            list <- ref.get.map(_.reverse)
+          } yield list).timed
+          assertRange = (from: Int, until: Int) => assert(list.slice(from, until).sorted)(equalTo((from + 1).to(until).toList))
+        } yield assert(duration)(isGreaterThanEqualTo(Duration.fromMillis(2500))) &&
+          assert(duration)(isLessThan(Duration.fromMillis(3000))) &&
+          assertRange(0, 1) &&
+          assertRange(1, 4) &&
+          assertRange(4, 5) &&
+          assertRange(5, 8) &&
+          assertRange(8, 9)
+      },
+      test("continues on errors") {
+        val rwl = ReadWriteLock.make[Unit]
+        for {
+          f1 <- writeZIO(rwl, ZIO.fail(1))
+          f2 <- writeZIO(rwl, ZIO.dieMessage("die"))
+          f3 <- writeZIO(rwl, ZIO.succeed(2))
+          r1 <- f1.join.cause
+          r2 <- f2.join.cause
+          r3 <- f3.join.cause
+        } yield assertTrue(r1.isFailure) &&
+          assertTrue(r2.isDie) &&
+          assertTrue(r3.isEmpty)
+      },
+      test("continues on grouped errors") {
+        val rwl = ReadWriteLock.make[Unit]
+        for {
+          f1 <- writeZIO(rwl, ZIO.fail(1))
+          f2 <- readZIO(rwl, ZIO.fail(2))
+          f3 <- readZIO(rwl, ZIO.dieMessage("die").ignore)
+          f4 <- readZIO(rwl, ZIO.succeed(3))
+          f5 <- writeZIO(rwl, ZIO.succeed(4))
+          r1 <- f1.join.cause
+          r2 <- f2.join.cause
+          r3 <- f3.join.cause
+          r4 <- f4.join.cause
+          r5 <- f5.join.cause
+        } yield assertTrue(r1.isFailure) &&
+          assertTrue(r2.isFailure) &&
+          assertTrue(r3.isDie) &&
+          assertTrue(r4.isEmpty) &&
+          assertTrue(r5.isEmpty)
       },
     ) @@ TestAspect.withLiveEnvironment
 
