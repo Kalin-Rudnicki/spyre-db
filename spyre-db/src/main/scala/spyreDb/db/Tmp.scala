@@ -7,24 +7,6 @@ import zio.stream.*
 
 object Tmp {
 
-  trait ReadWriteLock[L: Tag] {
-    def read[R, E, A](zio: ZIO[R & ReadWriteLock.ReadAccess[L], E, A]): ZIO[R, E, A]
-    def write[R, E, A](zio: ZIO[R & ReadWriteLock.WriteAccess[L] & ReadWriteLock.ReadAccess[L], E, A]): ZIO[R, E, A]
-  }
-  object ReadWriteLock {
-    final case class ReadAccess[L](accessId: UUID)
-    final case class WriteAccess[L](accessId: UUID)
-
-    def apply[L: Tag]: Applied[L] = new Applied[L]
-
-    final class Applied[L: Tag] private[ReadWriteLock] {
-      def read[R, E, A](zio: ZIO[R & ReadAccess[L], E, A]): ZIO[R & ReadWriteLock[L], E, A] =
-        ZIO.service[ReadWriteLock[L]].flatMap(_.read(zio))
-      def write[R, E, A](zio: ZIO[R & WriteAccess[L] & ReadAccess[L], E, A]): ZIO[R & ReadWriteLock[L], E, A] =
-        ZIO.service[ReadWriteLock[L]].flatMap(_.write(zio))
-    }
-  }
-
   // Storages
 
   trait Page[L, Row] {

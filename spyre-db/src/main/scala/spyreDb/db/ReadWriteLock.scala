@@ -9,8 +9,18 @@ import scala.annotation.tailrec
 import zio.*
 
 // TODO (KR) : Add tracking for when an effect was originally scheduled, and how long it ended up waiting
-//           : Then, have the ability for a whole request to track how long it was sleeping
+//           : Then, have the ability for a whole request to track how long it was ended up waiting
 //           : Then, this can be compared against its total runtime
+
+/**
+  * This class is a locking mechanism that will allow any amount of reads to run at once,
+  * but only 1 write can run at once, and no reads can run while a write is running.
+  * Therefore, when reads are happening, an incoming write needs to wait.
+  * There is a decision to be made about what happens when there are reads happening, a write is waiting, and then another read comes in.
+  * - Fair : The read queues up behind the write.
+  * - Efficient : The read skips the line. Reads will happen faster, but a write could end up waiting indefinitely.
+  * At least for an initial implementation, "Fair" was chosen.
+  */
 final class ReadWriteLock[L: Tag] {
   import ReadWriteLock.*
 
@@ -135,11 +145,13 @@ final class ReadWriteLock[L: Tag] {
   }
   import internal.*
 
-  // If the lock is currently waiting: start this off, and set the state to reading
-  // If the lock is currently reading:
-  //   If there is nothing in the queue, start this off, and add to the current
-  //   If there is something in the queue, add this to the front of the reversed queue
-  // If the lock is currently writing: add this to the front of the reversed queue
+  /**
+    * If the lock is currently waiting: start this off, and set the state to reading
+    * If the lock is currently reading:
+    * - If there is nothing in the queue, start this off, and add to the current
+    * - If there is something in the queue, add this to the front of the reversed queue
+    * If the lock is currently writing: add this to the front of the reversed queue
+    */
   def read[R: EnvironmentTag, E, A](zio: ZIO[R & ReadAccess[L], E, A]): ZIO[R, E, A] = {
     def attemptToAcquireReadAccess(readEffect: ReadEffect[E, A]): UIO[Option[UUID]] =
       ZIO.succeed {
@@ -166,9 +178,11 @@ final class ReadWriteLock[L: Tag] {
     }
   }
 
-  // If the lock is currently waiting: start this off, and set the state to reading
-  // If the lock is currently reading: add this to the front of the reversed queue
-  // If the lock is currently writing: add this to the front of the reversed queue
+  /**
+    * If the lock is currently waiting: start this off, and set the state to writing
+    * If the lock is currently reading: add this to the front of the reversed queue
+    * If the lock is currently writing: add this to the front of the reversed queue
+    */
   def write[R: EnvironmentTag, E, A](zio: ZIO[R & WriteAccess[L] & ReadAccess[L], E, A]): ZIO[R, E, A] = {
     def attemptToAcquireWriteAccess(writeEffect: WriteEffect[_, _]): UIO[Option[UUID]] =
       ZIO.succeed {
