@@ -39,15 +39,17 @@ object ReadWriteLockTests extends DefaultRunnableSpec {
         } yield assert(res)(equalTo(1))
       },
       test("read + write works") {
+        val rwl = ReadWriteLock.make[Unit]
         for {
-          res1 <- ReadWriteLock.make[Unit].read(ZIO.succeed(1))
-          res2 <- ReadWriteLock.make[Unit].write(ZIO.succeed(2))
+          res1 <- rwl.read(ZIO.succeed(1))
+          res2 <- rwl.write(ZIO.succeed(2))
         } yield assert(res1)(equalTo(1)) && assert(res2)(equalTo(2))
       },
       test("write + read works") {
+        val rwl = ReadWriteLock.make[Unit]
         for {
-          res1 <- ReadWriteLock.make[Unit].write(ZIO.succeed(1))
-          res2 <- ReadWriteLock.make[Unit].read(ZIO.succeed(2))
+          res1 <- rwl.write(ZIO.succeed(1))
+          res2 <- rwl.read(ZIO.succeed(2))
         } yield assert(res1)(equalTo(1)) && assert(res2)(equalTo(2))
       },
       test("runs in order") {
@@ -142,6 +144,28 @@ object ReadWriteLockTests extends DefaultRunnableSpec {
           assertTrue(r3.isDie) &&
           assertTrue(r4.isEmpty) &&
           assertTrue(r5.isEmpty)
+      },
+      test("all at once") {
+        val rwl = ReadWriteLock.make[Unit]
+        val readStrings = 0.until(10).toList.map { i => s"read-$i" }
+        val writeStrings = 0.until(10).toList.map { i => s"write-$i" }
+        val allStrings = readStrings ++ writeStrings
+        val readZIOs = readStrings.map { str =>
+          rwl.read { ZIO.unit.delay(Duration.fromMillis(50)) } &>
+            rwl.read { ZIO.unit.delay(Duration.fromMillis(50)) } &>
+            rwl.read { ZIO.succeed(str).delay(Duration.fromMillis(50)) } <&
+            rwl.read { ZIO.unit.delay(Duration.fromMillis(50)) } <&
+            rwl.read { ZIO.unit.delay(Duration.fromMillis(50)) }
+        }
+        val writeZIOs = writeStrings.map { str =>
+          rwl.write { ZIO.succeed(str).delay(Duration.fromMillis(50)) }
+        }
+        for {
+          allZIOs <- Random.shuffle(readZIOs ::: writeZIOs)
+          (duration, list) <- ZIO.foreachPar(allZIOs)(identity).timed
+        } yield assert(duration)(isGreaterThanEqualTo(Duration.fromMillis(550))) &&
+          assert(duration)(isLessThan(Duration.fromMillis(1250))) &&
+          assert(list.sorted)(equalTo(allStrings))
       },
     ) @@ TestAspect.withLiveEnvironment
 
