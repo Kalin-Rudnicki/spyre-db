@@ -50,7 +50,7 @@ lazy val `spyre-db` =
     .settings(
       name := "spyre-db",
       libraryDependencies ++= Seq(
-        MyOrg %% "klib" % "2.0.1",
+        MyOrg %% "klib" % "2.0.1" % "compile->compile;test->test",
       ),
       sonatypeCredentialHost := "s01.oss.sonatype.org",
     )

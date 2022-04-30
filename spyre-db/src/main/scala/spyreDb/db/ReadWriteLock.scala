@@ -65,14 +65,14 @@ final class ReadWriteLock[L: Tag] {
 
   private def getUnAppliedNext(rQueue: EffectQueue): UnAppliedNext = {
     @tailrec
-    def pullReads(queue: EffectQueue, rReads: NonEmptyList[ReadEffect[_, _]]): UnAppliedNext =
+    def getAsManyReadsAsPossible(queue: EffectQueue, rReads: NonEmptyList[ReadEffect[_, _]]): UnAppliedNext =
       queue match {
-        case Left(readEffect) :: tail => pullReads(tail, readEffect :: rReads)
+        case Left(readEffect) :: tail => getAsManyReadsAsPossible(tail, readEffect :: rReads)
         case _                        => UnAppliedNext.ToRead(rReads.reverse, queue.reverse)
       }
 
     rQueue.reverse match {
-      case Left(readEffect) :: tail   => pullReads(tail, NonEmptyList.one(readEffect))
+      case Left(readEffect) :: tail   => getAsManyReadsAsPossible(tail, NonEmptyList.one(readEffect))
       case Right(writeEffect) :: tail => UnAppliedNext.ToWrite(writeEffect, tail.reverse)
       case Nil                        => UnAppliedNext.ToWait
     }
@@ -198,6 +198,7 @@ object ReadWriteLock {
   final case class WriteAccess[L: Tag](accessId: UUID)
 
   def apply[L: Tag]: Applied[L] = Applied[L]
+  def make[L: Tag]: ReadWriteLock[L] = new ReadWriteLock[L]
 
   final class Applied[L: Tag] private[ReadWriteLock] {
     def read[R: EnvironmentTag, E, A](zio: ZIO[R & ReadAccess[L], E, A]): ZIO[R & ReadWriteLock[L], E, A] =
