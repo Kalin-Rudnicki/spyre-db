@@ -51,89 +51,89 @@ final class ReadWriteLock[L: Tag] {
       case ToRead(reads: NonEmptyList[(UUID, ReadEffect[_, _])])
       case ToWrite(write: (UUID, WriteEffect[_, _]))
     }
+
+    private val state: AtomicReference[State] = AtomicReference(State.Waiting)
+    @tailrec
+    def stateLoop[A](f: State => (State, A)): A = {
+      val oldState = state.get
+      val (newState, a) = f(oldState)
+      if (state.compareAndSet(oldState, newState)) a
+      else stateLoop(f)
+    }
+
+    private def getUnAppliedNext(rQueue: EffectQueue): UnAppliedNext = {
+      @tailrec
+      def getAsManyReadsAsPossible(queue: EffectQueue, rReads: NonEmptyList[ReadEffect[_, _]]): UnAppliedNext =
+        queue match {
+          case Left(readEffect) :: tail => getAsManyReadsAsPossible(tail, readEffect :: rReads)
+          case _                        => UnAppliedNext.ToRead(rReads.reverse, queue.reverse)
+        }
+
+      rQueue.reverse match {
+        case Left(readEffect) :: tail   => getAsManyReadsAsPossible(tail, NonEmptyList.one(readEffect))
+        case Right(writeEffect) :: tail => UnAppliedNext.ToWrite(writeEffect, tail.reverse)
+        case Nil                        => UnAppliedNext.ToWait
+      }
+    }
+
+    private def getAppliedNext(rQueue: EffectQueue): (State, AppliedNext) =
+      getUnAppliedNext(rQueue) match {
+        case UnAppliedNext.ToRead(reads, rQueue) =>
+          val applied = reads.map((UUID.randomUUID, _))
+          (State.Reading(applied.toList.map(_._1).toSet, rQueue), AppliedNext.ToRead(applied))
+        case UnAppliedNext.ToWrite(write, rQueue) =>
+          val uuid = UUID.randomUUID
+          (State.Writing(uuid, rQueue), AppliedNext.ToWrite((uuid, write)))
+        case UnAppliedNext.ToWait => (State.Waiting, AppliedNext.ToWait)
+      }
+
+    private def forkExecuteNext(next: AppliedNext): UIO[Unit] =
+      next match {
+        case AppliedNext.ToRead(reads)                => ZIO.foreachParDiscard(reads.toList) { (uuid, readEffect) => registerReadEffect(uuid, readEffect) }.fork.unit
+        case AppliedNext.ToWrite((uuid, writeEffect)) => registerWriteEffect(uuid, writeEffect).fork.unit
+        case AppliedNext.ToWait                       => ZIO.unit
+      }
+
+    def registerReadEffect(uuid: UUID, readEffect: ReadEffect[_, _]): UIO[Any] = {
+      val attemptToCloseRead: UIO[AppliedNext] =
+        ZIO.succeed {
+          stateLoop {
+            case State.Reading(reading, rQueue) =>
+              val newReading = reading - uuid
+              if (newReading.isEmpty) getAppliedNext(rQueue)
+              else (State.Reading(newReading, rQueue), AppliedNext.ToWait)
+            case state => throw new RuntimeException(s"Internal Defect [registerReadEffect] : $state")
+          }
+        }
+
+      ZIO.succeed {
+        readEffect.register {
+          readEffect.zio.provideLayer(ZLayer.succeed(ReadAccess(uuid))).ensuring {
+            attemptToCloseRead.flatMap(forkExecuteNext)
+          }
+        }
+      }
+    }
+
+    def registerWriteEffect(uuid: UUID, writeEffect: WriteEffect[_, _]): UIO[Any] = {
+      val attemptToCloseWrite: UIO[AppliedNext] =
+        ZIO.succeed {
+          stateLoop {
+            case State.Writing(_, rQueue) => getAppliedNext(rQueue)
+            case state                    => throw new RuntimeException(s"Internal Defect [registerWriteEffect] : $state")
+          }
+        }
+
+      ZIO.succeed {
+        writeEffect.register {
+          writeEffect.zio.provideLayer(ZLayer.succeed(WriteAccess(uuid)) ++ ZLayer.succeed(ReadAccess(uuid))).ensuring {
+            attemptToCloseWrite.flatMap(forkExecuteNext)
+          }
+        }
+      }
+    }
   }
   import internal.*
-
-  private val state: AtomicReference[State] = AtomicReference(State.Waiting)
-  @tailrec
-  private def stateLoop[A](f: State => (State, A)): A = {
-    val oldState = state.get
-    val (newState, a) = f(oldState)
-    if (state.compareAndSet(oldState, newState)) a
-    else stateLoop(f)
-  }
-
-  private def getUnAppliedNext(rQueue: EffectQueue): UnAppliedNext = {
-    @tailrec
-    def getAsManyReadsAsPossible(queue: EffectQueue, rReads: NonEmptyList[ReadEffect[_, _]]): UnAppliedNext =
-      queue match {
-        case Left(readEffect) :: tail => getAsManyReadsAsPossible(tail, readEffect :: rReads)
-        case _                        => UnAppliedNext.ToRead(rReads.reverse, queue.reverse)
-      }
-
-    rQueue.reverse match {
-      case Left(readEffect) :: tail   => getAsManyReadsAsPossible(tail, NonEmptyList.one(readEffect))
-      case Right(writeEffect) :: tail => UnAppliedNext.ToWrite(writeEffect, tail.reverse)
-      case Nil                        => UnAppliedNext.ToWait
-    }
-  }
-
-  private def getAppliedNext(rQueue: EffectQueue): (State, AppliedNext) =
-    getUnAppliedNext(rQueue) match {
-      case UnAppliedNext.ToRead(reads, rQueue) =>
-        val applied = reads.map((UUID.randomUUID, _))
-        (State.Reading(applied.toList.map(_._1).toSet, rQueue), AppliedNext.ToRead(applied))
-      case UnAppliedNext.ToWrite(write, rQueue) =>
-        val uuid = UUID.randomUUID
-        (State.Writing(uuid, rQueue), AppliedNext.ToWrite((uuid, write)))
-      case UnAppliedNext.ToWait => (State.Waiting, AppliedNext.ToWait)
-    }
-
-  private def forkExecuteNext(next: AppliedNext): UIO[Unit] =
-    next match {
-      case AppliedNext.ToRead(reads)                => ZIO.foreachParDiscard(reads.toList) { (uuid, readEffect) => registerReadEffect(uuid, readEffect) }.fork.unit
-      case AppliedNext.ToWrite((uuid, writeEffect)) => registerWriteEffect(uuid, writeEffect).fork.unit
-      case AppliedNext.ToWait                       => ZIO.unit
-    }
-
-  private def registerReadEffect(uuid: UUID, readEffect: ReadEffect[_, _]): UIO[Any] = {
-    val attemptToCloseRead: UIO[AppliedNext] =
-      ZIO.succeed {
-        stateLoop {
-          case State.Reading(reading, rQueue) =>
-            val newReading = reading - uuid
-            if (newReading.isEmpty) getAppliedNext(rQueue)
-            else (State.Reading(newReading, rQueue), AppliedNext.ToWait)
-          case state => throw new RuntimeException(s"Internal Defect [registerReadEffect] : $state")
-        }
-      }
-
-    ZIO.succeed {
-      readEffect.register {
-        readEffect.zio.provideLayer(ZLayer.succeed(ReadAccess(uuid))).ensuring {
-          attemptToCloseRead.flatMap(forkExecuteNext)
-        }
-      }
-    }
-  }
-
-  private def registerWriteEffect(uuid: UUID, writeEffect: WriteEffect[_, _]): UIO[Any] = {
-    val attemptToCloseWrite: UIO[AppliedNext] =
-      ZIO.succeed {
-        stateLoop {
-          case State.Writing(_, rQueue) => getAppliedNext(rQueue)
-          case state                    => throw new RuntimeException(s"Internal Defect [registerWriteEffect] : $state")
-        }
-      }
-
-    ZIO.succeed {
-      writeEffect.register {
-        writeEffect.zio.provideLayer(ZLayer.succeed(WriteAccess(uuid)) ++ ZLayer.succeed(ReadAccess(uuid))).ensuring {
-          attemptToCloseWrite.flatMap(forkExecuteNext)
-        }
-      }
-    }
-  }
 
   // If the lock is currently waiting: start this off, and set the state to reading
   // If the lock is currently reading:
@@ -187,7 +187,7 @@ final class ReadWriteLock[L: Tag] {
       for {
         writeEffect <- WriteEffect.fromZIO[R, E, A](zio, register)
         writeAccess <- attemptToAcquireWriteAccess(writeEffect)
-        _ <- ZIO.foreach(writeAccess)(registerWriteEffect(_, writeEffect))
+        _ <- ZIO.foreachDiscard(writeAccess)(registerWriteEffect(_, writeEffect))
       } yield ()
     }
   }
