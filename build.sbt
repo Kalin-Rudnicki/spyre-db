@@ -52,5 +52,6 @@ lazy val `spyre-db` =
       libraryDependencies ++= Seq(
         MyOrg %% "klib" % "2.0.1" % "compile->compile;test->test",
       ),
+      testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
       sonatypeCredentialHost := "s01.oss.sonatype.org",
     )
